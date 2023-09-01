@@ -1,0 +1,1 @@
+6a088d432499d6462ae2fcb1e8aa6a5e00eab42bd423fb7a4c25e25e1e3446577e8336b682a53b50bc26ef5ab3d45f2dbc67f5761847d302e379a3caccda5dde  sensu-redis-sh-checks.tar.gz
