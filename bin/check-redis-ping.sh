@@ -12,7 +12,7 @@
 #   check-redis-ping.sh -h host -p port
 
 ping_check="$(/bin/redis-cli "$1" "$2" "$3" "$4" PING 2>&1)"
-if [ "$ping_check" ]
+if [ "$?" -eq 0 ]
 then
 echo "OK. Redis is alive"
 exit 0
