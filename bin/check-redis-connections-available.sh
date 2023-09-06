@@ -12,19 +12,29 @@
 #
 # USAGE:
 #   check-redis-connections-available.sh -c CRITICAL_COUNT -w WARNING_COUNT -h REDIS_HOST -p PORT
-connection_check="$(/bin/redis-cli "$5" "$6" "$7" "$8" config get maxclients 2>&1)"
+connection_check="$(/bin/redis-cli "$5" "$6" "$7" "$8" PING 2>&1)"
 if [ $? -ge 1 ]
 then
 echo "Connection ERROR: $connection_check"
 exit 1
 else
-max_clients="$(/bin/redis-cli "$5" "$6" "$7" "$8" config get maxclients 2>&1 | cut -d ' ' -f2 | tail -1 | awk '{print $1-0}')"
-connected_clients="$(/bin/redis-cli "$5" "$6" "$7" "$8" info clients 2>&1 | sed -n '2p' | cut -d ':' -f2 | awk '{print $1-0}')"
-available_connection="$(echo "$max_clients" "$connected_clients" | awk '{print $1 - $2}')"
+max_clients="$(/bin/redis-cli "$5" "$6" "$7" "$8" config get maxclients 2>&1 | cut -d ' ' -f2 | tail -1 | tr -d $'\r')"
+connected_clients="$(/bin/redis-cli "$5" "$6" "$7" "$8" info clients 2>&1 | sed -n '2p' | cut -d ':' -f2 | tr -d $'\r')"
+available_connection="$(echo "$max_clients-$connected_clients" | bc -l | tr -d $'\r')"
 
-c_count="$(echo "$2" | awk '{print $1-0}')"
-w_count="$(echo "$4" | awk '{print $1-0}')"
+c_count="$(echo "$2" | bc)"
+w_count="$(echo "$4" | bc)"
 
-echo "$available_connection $connected_clients $max_clients $c_count $w_count $6 $8" | awk '{if ($1 <= $4) {print "CRITICAL Only ",$1,"connections left available (",$2,"/",$3,") on Redis",$6,":",$7; exit 1} else if ($1 <= $5) {print "WARNING Only ",$1,"connections left available (",$2,"/",$3,") on Redis",$6,":",$7; exit 1} else {print "OK There are",$1,"connections available (",$2,"/",$3,") on Redis",$6,":",$7; exit 0}}'
-
+if [ "$available_connection" -le "$c_count" ]
+then
+echo "CRITICAL Only $available_connection connections left available ($connected_clients/$max_clients) on Redis $6:$8"
+exit 1
+elif [ "$available_connection" -le "$w_count" ]
+then
+echo "WARNING Only $available_connection connections left available ($connected_clients/$max_clients) on Redis $6:$8"
+exit 1
+else
+echo "OK There are $available_connection connections available ($connected_clients/$max_clients) on Redis $6:$8"
+exit 0
+fi
 fi

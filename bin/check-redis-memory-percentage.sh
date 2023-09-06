@@ -16,25 +16,36 @@
 #
 
 
-connection_check="$(/bin/redis-cli "$5" "$6" "$7" "$8" config get maxclients 2>&1)"
+connection_check="$(/bin/redis-cli "$5" "$6" "$7" "$8" PING 2>&1)"
 if [ $? -ge 1 ]
 then
 echo "Connection ERROR: $connection_check"
 exit 1
 else
-max_memory="$(/bin/redis-cli "$5" "$6" "$7" "$8" info memory | grep 'maxmemory:' | cut -d ':' -f2 | awk '{print $1 - 0}')"
+max_memory="$(/bin/redis-cli "$5" "$6" "$7" "$8" info memory | grep 'maxmemory:' | cut -d ':' -f2 | tr -d $'\r')"
 if [ $((max_memory)) -eq 0 ]
 then
-total_memory="$(/bin/redis-cli "$5" "$6" "$7" "$8" info memory | grep 'total_system_memory:' | cut -d ':' -f2 | awk '{print $1 - 0}')"
+total_memory="$(/bin/redis-cli "$5" "$6" "$7" "$8" info memory | grep 'total_system_memory:' | cut -d ':' -f2 | tr -d $'\r' )"
 fi
 
-memory_in_use="$(/bin/redis-cli "$5" "$6" "$7" "$8" info memory | grep 'used_memory:' | cut -d ':' -f2 | awk '{print $1 - 0}')"
+memory_in_use="$(/bin/redis-cli "$5" "$6" "$7" "$8" info memory | grep 'used_memory:' | cut -d ':' -f2 | tr -d $'\r')"
 
-used_memory="$(echo "$memory_in_use $total_memory" | awk '{printf "%.2f", ($1 / $2)*100}')"
+used_memory="$(echo "($memory_in_use/$total_memory)*100"|bc -l)"
+used_memory="$(printf "%.2f" "$used_memory")"
 
-c_memory="$(echo "$2" | awk '{printf "%.2f", $1}')"
-w_memory="$(echo "$4" | awk '{printf "%.2f", $1}')"
+c_memory="$(echo "$2" | bc -l)"
+w_memory="$(echo "$4" | bc -l)"
 
-echo "$used_memory $c_memory $w_memory $6 $8" | awk '{if ($1 >= $2) {print "CRITICAL Redis running on ",$4,":",$5," is above critical limit: ",$1,"%"; exit 1} else if ($1 >= $3) {print "WARNING Redis running on ",$4,":",$5," is above warning limit: ",$1,"%"; exit 1} else {print "OK Redis running on ",$4,":",$5," memory usage ",$1,"% is below the defined limits"; exit 0}}'
-
+if (( $(echo "$used_memory >= $c_memory" |bc -l) ))
+then
+echo "CRITICAL Redis running on $6:$8 is above critical limit: $used_memory %"
+exit 1
+elif (( $(echo "$used_memory >= $w_memory" |bc -l) ))
+then
+echo "WARNING Redis running on $6:$8 is above warning limit: $used_memory %"
+exit 1
+else
+echo "OK Redis running on $6:$8 memory usage: $used_memory % is below the defined limits"
+exit 0
+fi
 fi
